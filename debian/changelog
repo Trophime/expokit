@@ -1,0 +1,43 @@
+expokit (1.0-6) unstable; urgency=medium
+
+  * d/control: update to debian policy 4.5.0
+
+ -- Christophe Trophime <christophe.trophime@lncmi.cnrs.fr>  Wed, 21 Oct 2020 10:34:24 +0200
+
+expokit (1.0-5) unstable; urgency=medium
+
+  * Rebuild against gfortan 8
+  * disable support for octave
+
+ -- Christophe Trophime <christophe.trophime@lncmi.cnrs.fr>  Tue, 06 Nov 2018 17:15:40 +0100
+
+expokit (1.0-4) unstable; urgency=medium
+
+  * Rebuild for gfortran 7
+
+ -- Christophe Trophime <christophe.trophime@lncmi.cnrs.fr>  Thu, 28 Sep 2017 09:33:00 +0200
+
+expokit (1.0-3) unstable; urgency=low
+
+  * Rebuild for gfortran 4.7
+  * Switch from cdbs to debhelper
+  * Switch to source format quilt
+  
+  * Rename libexpokit-matlab to octave-expokit
+
+ -- Christophe Trophime <christophe.trophime@lncmi.cnrs.fr>  Wed, 11 Jul 2012 09:47:30 +0200
+
+expokit (1.0-2) unstable; urgency=low
+
+  * switch to quilt for patch
+
+ -- Christophe Trophime <christophe.trophime@grenoble.cnrs.fr>  Mon, 14 Sep 2009 09:55:50 +0200
+
+expokit (1.0-1) unstable; urgency=low
+
+  * new upstream version
+  * Fix lapack bindings 
+  * Added shared library
+
+ -- Christophe Trophime <christophe.trophime@grenoble.cnrs.fr>  Mon, 24 Aug 2009 17:47:25 +0200
+

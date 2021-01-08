@@ -1,0 +1,1202 @@
+Index: expokit-1.0/fortran/expokit.f
+===================================================================
+--- expokit-1.0.orig/fortran/expokit.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/expokit.f	2009-09-14 11:13:05.000000000 +0200
+@@ -1,8 +1,11 @@
+ *----------------------------------------------------------------------|
+-      subroutine DMEXPV( n, m, t, v, w, tol, anorm,
++      subroutine DMEXPV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      double precision a(*)
+       integer n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm, v(n), w(n), wsp(lwsp)
+       external matvec
+@@ -118,11 +121,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500,
+-     .           mxreject = 0,
+-     .           ideg     = 6,
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -156,12 +156,21 @@
+       intrinsic AINT,ABS,DBLE,LOG10,MAX,MIN,NINT,SIGN,SQRT
+       double precision DDOT, DNRM2, DASUM
+ 
++*
++      avnorm = 0.0      
++*
+ *---  check restrictions on input parameters ...
+       iflag = 0
+       if ( lwsp.lt.n*(m+2)+5*(m+2)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+2 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DMEXPV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+2)+5*(m+2)**2+ideg+1
++         print*,liwsp,m+2
++         print*,m,n
++         stop 'bad sizes (in input of DMEXPV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -238,7 +247,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          do i = 1,j
+             hij = DDOT( n, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+             call DAXPY( n, -hij, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+@@ -260,7 +269,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1 for the 2-corrected scheme ...
+@@ -475,7 +484,12 @@
+       iflag = 0
+       if ( ldh.lt.m ) iflag = -1
+       if ( lwsp.lt.4*mm+ideg+1 ) iflag = -2
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DGPADM)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,ldh,m
++         print*,lwsp,4*mm+ideg+1
++         stop 'bad sizes (in input of DGPADM)'
++      endif
+ *
+ *---  initialise pointers ...
+ *
+@@ -645,7 +659,12 @@
+       iflag = 0
+       if ( ldh.lt.m ) iflag = -1
+       if ( lwsp.lt.4*mm+ideg+1 ) iflag = -2
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DSPADM)'
++      if ( iflag.ne.0 ) then
++          print*,'iflag=',iflag
++          print*,ldh,m
++          print*,lwsp,4*mm+ideg+1
++          stop 'bad sizes (in input of DSPADM)'
++      endif
+ *
+ *---  initialise pointers ...
+ *
+@@ -818,7 +837,12 @@
+       iflag = 0
+       if ( ldh.lt.m ) iflag = -1
+       if ( lwsp.lt.4*mm+ideg+1 ) iflag = -2
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of ZGPADM)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,ldh,m
++         print*,lwsp,4*mm+ideg+1
++         stop 'bad sizes (in input of ZGPADM)'
++      endif	 
+ *
+ *---  initialise pointers ...
+ *
+@@ -990,7 +1014,12 @@
+       iflag = 0
+       if ( ldh.lt.m ) iflag = -1
+       if ( lwsp.lt.4*mm+ideg+1 ) iflag = -2
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of ZHPADM)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,ldh,m
++         print*,lwsp,4*mm+ideg+1
++         stop 'bad sizes (in input of ZHPADM)'
++      endif
+ *
+ *---  initialise pointers ...
+ *
+@@ -1628,10 +1657,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine DGEXPV( n, m, t, v, w, tol, anorm,
++      subroutine DGEXPV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      double precision a(*)
+       integer n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm, v(n), w(n), wsp(lwsp)
+       external matvec
+@@ -1728,11 +1760,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 1000,
+-     .           mxreject = 0,
+-     .           ideg     = 6,
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -1764,13 +1793,21 @@
+ 
+       intrinsic AINT,ABS,DBLE,LOG10,MAX,MIN,NINT,SIGN,SQRT
+       double precision DDOT, DNRM2
++      
++*      print*,n,nz,nzmax,m,ideg,lwsp,liwsp
+ 
+ *---  check restrictions on input parameters ...
+       iflag = 0
+       if ( lwsp.lt.n*(m+2)+5*(m+2)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+2 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DGEXPV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+2)+5*(m+2)**2+ideg+1
++         print*,liwsp,m+2
++         print*,m,n
++         stop 'bad sizes (in input of DGEXPV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -1845,7 +1882,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          do i = 1,j
+             hij = DDOT( n, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+             call DAXPY( n, -hij, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+@@ -1867,7 +1904,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1 for the 2-corrected scheme ...
+@@ -2008,10 +2045,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine DSEXPV( n, m, t, v, w, tol, anorm,
++      subroutine DSEXPV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      double precision a(*)
+       integer n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm, v(n), w(n), wsp(lwsp)
+       external matvec
+@@ -2109,11 +2149,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500,
+-     .           mxreject = 0,
+-     .           ideg     = 6,
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -2146,12 +2183,21 @@
+       intrinsic AINT,ABS,DBLE,LOG10,MAX,MIN,NINT,SIGN,SQRT
+       double precision DDOT, DNRM2
+ 
++*
++      avnorm = 0.0      
++*
+ *---  check restrictions on input parameters ...
+       iflag = 0
+       if ( lwsp.lt.n*(m+2)+5*(m+2)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+2 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DSEXPV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+2)+5*(m+2)**2+ideg+1
++         print*,liwsp,m+2
++         print*,m,n
++         stop 'bad sizes (in input of DSEXPV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -2226,7 +2272,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          if ( j.gt.1 )
+      .     call DAXPY(n,-wsp(ih+(j-1)*mh+j-2),wsp(j1v-2*n),1,wsp(j1v),1)
+          hjj = DDOT( n, wsp(j1v-n),1, wsp(j1v),1 )
+@@ -2249,7 +2295,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1 for the 2-corrected scheme ...
+@@ -2390,10 +2436,13 @@
+ *----------------------------------------------------------------------|
+ 
+ *----------------------------------------------------------------------|
+-      subroutine ZGEXPV( n, m, t, v, w, tol, anorm,
++      subroutine ZGEXPV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      complex*16 a(*)
+       integer          n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm
+       complex*16       v(n), w(n), wsp(lwsp)
+@@ -2493,11 +2542,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500,
+-     .           mxreject = 0,
+-     .           ideg     = 6,
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -2540,7 +2586,13 @@
+       if ( lwsp.lt.n*(m+2)+5*(m+2)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+2 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of ZGEXPV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+2)+5*(m+2)**2+ideg+1
++         print*,liwsp,m+2
++         print*,m,n
++         stop 'bad sizes (in input of ZGEXPV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -2614,7 +2666,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          do i = 1,j
+             hij = ZDOTC( n, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+             call ZAXPY( n, -hij, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+@@ -2636,7 +2688,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DZNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1 for the 2-corrected scheme ...
+@@ -2776,10 +2828,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine ZHEXPV( n, m, t, v, w, tol, anorm,
++      subroutine ZHEXPV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      complex*16 a(*)
+       integer          n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm
+       complex*16       v(n), w(n), wsp(lwsp)
+@@ -2878,11 +2933,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500,
+-     .           mxreject = 0,
+-     .           ideg     = 6,
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -2919,13 +2971,22 @@
+       complex*16 ZDOTC
+       double precision DZNRM2
+ *
++      avnorm = 0.0      
++*
++*
+ *---  check restrictions on input parameters ...
+ *
+       iflag = 0
+       if ( lwsp.lt.n*(m+2)+5*(m+2)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+2 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DHEXPV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+2)+5*(m+2)**2+ideg+1
++         print*,liwsp,m+2
++         print*,m,n
++         stop 'bad sizes (in input of DHEXPV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -3000,7 +3061,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          if ( j.gt.1 )
+      .     call ZAXPY(n,-wsp(ih+(j-1)*mh+j-2),wsp(j1v-2*n),1,wsp(j1v),1)
+          hjj = ZDOTC( n, wsp(j1v-n),1, wsp(j1v),1 )
+@@ -3023,7 +3084,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DZNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1 for the 2-corrected scheme ...
+@@ -3165,10 +3226,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine DGPHIV( n, m, t, u, v, w, tol, anorm,
++      subroutine DGPHIV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, u, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag ) 
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      double precision a(*)
+       integer n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm, u(n), v(n), w(n), wsp(lwsp)
+       external matvec
+@@ -3257,11 +3321,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 1000, 
+-     .           mxreject = 0,
+-     .           ideg     = 6, 
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -3293,12 +3354,22 @@
+       intrinsic AINT,ABS,DBLE,LOG10,MAX,MIN,NINT,SIGN,SQRT
+       double precision DDOT, DNRM2
+ 
++*
++      xm = 0.0
++      avnorm = 0.0      
++*
+ *---  check restrictions on input parameters ...
+       iflag = 0
+       if ( lwsp.lt.n*(m+3)+5*(m+3)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+3 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DGPHIV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+3)+5*(m+3)**2+ideg+1
++         print*,liwsp,m+3
++         print*,m,n
++         stop 'bad sizes (in input of DGPHIV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -3348,7 +3419,7 @@
+  100  if ( t_now.ge.t_out ) goto 500
+ 
+       nmult =  nmult + 1
+-      call matvec( w, wsp(iv) )
++      call matvec( n, nz, nzmax, ia, ja, a, w, wsp(iv) )
+       call DAXPY( n, 1.0d0, u,1, wsp(iv),1 )
+       beta = DNRM2( n, wsp(iv),1 )
+       if ( beta.eq.0.0d0 ) goto 500
+@@ -3373,7 +3444,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          do i = 1,j
+             hij = DDOT( n, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+             call DAXPY( n, -hij, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+@@ -3395,7 +3466,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1's for the 3-extended scheme ...
+@@ -3523,10 +3594,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine DSPHIV( n, m, t, u, v, w, tol, anorm,
++      subroutine DSPHIV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, u, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag ) 
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      double precision a(*)
+       integer n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm, u(n), v(n), w(n), wsp(lwsp)
+       external matvec
+@@ -3615,11 +3689,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500, 
+-     .           mxreject = 0,
+-     .           ideg     = 6, 
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -3651,12 +3722,22 @@
+       intrinsic AINT,ABS,DBLE,LOG10,MAX,MIN,NINT,SIGN,SQRT
+       double precision DDOT, DNRM2
+ 
++*
++      xm = 0.0
++      avnorm = 0.0      
++*
+ *---  check restrictions on input parameters ...
+       iflag = 0
+       if ( lwsp.lt.n*(m+3)+5*(m+3)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+3 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of DSPHIV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+3)+5*(m+3)**2+ideg+1
++         print*,liwsp,m+3
++         print*,m,n
++         stop 'bad sizes (in input of DSPHIV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -3706,7 +3787,7 @@
+  100  if ( t_now.ge.t_out ) goto 500
+ 
+       nmult =  nmult + 1
+-      call matvec( w, wsp(iv) )
++      call matvec( n, nz, nzmax, ia, ja, a, w, wsp(iv) )
+       call DAXPY( n, 1.0d0, u,1, wsp(iv),1 )
+       beta = DNRM2( n, wsp(iv),1 )
+       if ( beta.eq.0.0d0 ) goto 500
+@@ -3731,7 +3812,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          if ( j.gt.1 )
+      .     call DAXPY(n,-wsp(ih+(j-1)*mh+j-2),wsp(j1v-2*n),1,wsp(j1v),1)
+          hjj = DDOT( n, wsp(j1v-n),1, wsp(j1v),1 )
+@@ -3754,7 +3835,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1's for the 3-extended scheme ...
+@@ -3887,10 +3968,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine ZGPHIV( n, m, t, u, v, w, tol, anorm,
++      subroutine ZGPHIV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, u, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      complex*16 a(*)
+       integer          n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm
+       complex*16       u(n), v(n), w(n), wsp(lwsp)
+@@ -3981,11 +4065,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500, 
+-     .           mxreject = 0,
+-     .           ideg     = 6, 
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -4021,13 +4102,22 @@
+       complex*16 ZDOTC
+       double precision DZNRM2
+ *
++      xm = 0.0
++      avnorm = 0.0      
++*
+ *---  check restrictions on input parameters ...
+ *
+       iflag = 0
+       if ( lwsp.lt.n*(m+3)+5*(m+3)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+3 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of ZGPHIV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+3)+5*(m+3)**2+ideg+1
++         print*,liwsp,m+3
++         print*,m,n
++         stop 'bad sizes (in input of ZGPHIV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -4076,7 +4166,7 @@
+  100  if ( t_now.ge.t_out ) goto 500
+ 
+       nmult =  nmult + 1
+-      call matvec( w, wsp(iv) )
++      call matvec( n, nz, nzmax, ia, ja, a, w, wsp(iv) )
+       call ZAXPY( n, ONE, u,1, wsp(iv),1 )
+       beta = DZNRM2( n, wsp(iv),1 )
+       if ( beta.eq.0.0d0 ) goto 500
+@@ -4101,7 +4191,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          do i = 1,j
+             hij = ZDOTC( n, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+             call ZAXPY( n, -hij, wsp(iv+(i-1)*n),1, wsp(j1v),1 )
+@@ -4123,7 +4213,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DZNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1's for the 3-extended scheme ...
+@@ -4256,10 +4346,13 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine ZHPHIV( n, m, t, u, v, w, tol, anorm,
++      subroutine ZHPHIV( n, nz, nzmax, ia, ja, a, 
++     .                   m, t, u, v, w, tol, anorm,
+      .                   wsp,lwsp, iwsp,liwsp, matvec, itrace,iflag )
+ 
+       implicit none
++      integer nz, nzmax, ia(*), ja(*)
++      complex*16 a(*)
+       integer          n, m, lwsp, liwsp, itrace, iflag, iwsp(liwsp)
+       double precision t, tol, anorm
+       complex*16       u(n), v(n), w(n), wsp(lwsp)
+@@ -4349,11 +4442,8 @@
+ *
+       integer mxstep, mxreject, ideg
+       double precision delta, gamma
+-      parameter( mxstep   = 500, 
+-     .           mxreject = 0,
+-     .           ideg     = 6, 
+-     .           delta    = 1.2d0,
+-     .           gamma    = 0.9d0 )
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
+ 
+ *     mxstep  : maximum allowable number of integration steps.
+ *               The value 0 means an infinite number of steps.
+@@ -4389,13 +4479,22 @@
+       complex*16 ZDOTC
+       double precision DZNRM2
+ *
++      xm = 0.0
++      avnorm = 0.0      
++*
+ *---  check restrictions on input parameters ...
+ *
+       iflag = 0
+       if ( lwsp.lt.n*(m+3)+5*(m+3)**2+ideg+1 ) iflag = -1
+       if ( liwsp.lt.m+3 ) iflag = -2
+       if ( m.ge.n .or. m.le.0 ) iflag = -3
+-      if ( iflag.ne.0 ) stop 'bad sizes (in input of ZHPHIV)'
++      if ( iflag.ne.0 ) then
++         print*,'iflag=',iflag
++         print*,lwsp,n*(m+3)+5*(m+3)**2+ideg+1
++         print*,liwsp,m+3
++         print*,m,n
++         stop 'bad sizes (in input of ZHPHIV)'
++      endif
+ *
+ *---  initialisations ...
+ *
+@@ -4444,7 +4543,7 @@
+  100  if ( t_now.ge.t_out ) goto 500
+ 
+       nmult =  nmult + 1
+-      call matvec( w, wsp(iv) )
++      call matvec( n, nz, nzmax, ia, ja, a, w, wsp(iv) )
+       call ZAXPY( n, ONE, u,1, wsp(iv),1 )
+       beta = DZNRM2( n, wsp(iv),1 )
+       if ( beta.eq.0.0d0 ) goto 500
+@@ -4469,7 +4568,7 @@
+       j1v = iv + n
+       do 200 j = 1,m
+          nmult = nmult + 1
+-         call matvec( wsp(j1v-n), wsp(j1v) )
++         call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+          if ( j.gt.1 )
+      .     call ZAXPY(n,-wsp(ih+(j-1)*mh+j-2),wsp(j1v-2*n),1,wsp(j1v),1)
+          hjj = ZDOTC( n, wsp(j1v-n),1, wsp(j1v),1 )
+@@ -4491,7 +4590,7 @@
+          j1v = j1v + n
+  200  continue
+       nmult = nmult + 1
+-      call matvec( wsp(j1v-n), wsp(j1v) )
++      call matvec( n, nz, nzmax, ia, ja, a, wsp(j1v-n), wsp(j1v) )
+       avnorm = DZNRM2( n, wsp(j1v),1 )
+ *
+ *---  set 1's for the 3-extended scheme ...
+Index: expokit-1.0/fortran/mataid.f
+===================================================================
+--- expokit-1.0.orig/fortran/mataid.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/mataid.f	2009-09-14 11:13:05.000000000 +0200
+@@ -9,18 +9,16 @@
+ *     the most advantageous matrix-vector multiplication routine.      *
+ *----------------------------------------------------------------------*
+ *----------------------------------------------------------------------*
+-      subroutine dgcoov ( x, y )
++      subroutine dgcoov ( n, nz, nzmax, ia, ja, a, x, y )
+       implicit none
++      integer n, nz, nzmax
++      integer ia(nzmax), ja(nzmax)
++      double precision a(nzmax)
+       double precision x(*), y(*)
+ *
+ *---  Computes y = A*x. A is passed via a fortran `common statement'.
+ *---  A is assumed here to be under the COOrdinates storage format.
+ *
+-      integer n, nz, nzmax
+-      parameter( nzmax = 600000 )
+-      integer ia(nzmax), ja(nzmax)
+-      double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+       integer i, j
+  
+       do j = 1,n
+@@ -32,18 +30,16 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine dgcrsv ( x, y )
++      subroutine dgcrsv ( n, nz, nzmax, ia, ja, a, x, y )
+       implicit none
++      integer n, nz, nzmax
++      integer ia(nzmax), ja(nzmax)
++      double precision a(nzmax)
+       double precision x(*), y(*)
+ *
+ *---  Computes y = A*x. A is passed via a fortran `common statement'.
+ *---  A is assumed to be under the Compress Row Storage (CRS) format.
+ *
+-      integer n, nz, nzmax
+-      parameter( nzmax = 600000 )
+-      integer ia(nzmax), ja(nzmax)
+-      double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+       integer i, j
+ 
+       do i = 1,n
+@@ -55,18 +51,16 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine dgccsv( x, y )
++      subroutine dgccsv( n, nz, nzmax, ia, ja, a, x, y )
+       implicit none
++      integer n, nz, nzmax
++      integer ia(nzmax), ja(nzmax)
++      double precision a(nzmax)
+       double precision x(*), y(*)
+ *
+ *---  Computes y = A*x. A is passed via a fortran `common statement'.
+ *---  A is assumed to be under the Compress Column Storage (CCS) format.
+ *
+-      integer n, nz, nzmax
+-      parameter( nzmax = 600000 )
+-      integer ia(nzmax), ja(nzmax)
+-      double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+       integer i, j
+ 
+       do i = 1,n
+@@ -91,18 +85,16 @@
+ *     the most advantageous matrix-vector multiplication routine.      *
+ *----------------------------------------------------------------------*
+ *----------------------------------------------------------------------*
+-      subroutine zgcoov ( x, y )
++      subroutine zgcoov ( n, nz, nzmax, ia, ja, a, x, y )
+       implicit none
++      integer n, nz, nzmax
++      integer ia(nzmax), ja(nzmax)
++      complex*16 a(nzmax)
+       complex*16 x(*), y(*)
+ *
+ *---  Computes y = A*x. A is passed via a fortran `common statement'.
+ *---  A is assumed here to be under the COOrdinates storage format.
+ *
+-      integer n, nz, nzmax
+-      parameter( nzmax = 50000 )
+-      integer ia(nzmax), ja(nzmax)
+-      complex*16 a(nzmax)
+-      common /CMAT/ a, ia, ja, nz, n
+ 
+       integer i, j
+       complex*16 ZERO
+@@ -117,18 +109,16 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine zgcrsv ( x, y )
++      subroutine zgcrsv ( n, nz, nzmax, ia, ja, a, x, y )
+       implicit none
++      integer n, nz, nzmax
++      integer ia(nzmax), ja(nzmax)
++      complex*16 a(nzmax)
+       complex*16 x(*), y(*)
+ *
+ *---  Computes y = A*x. A is passed via a fortran `common statement'.
+ *---  A is assumed to be under the Compress Row Storage (CRS) format.
+ *
+-      integer n, nz, nzmax
+-      parameter( nzmax = 50000 )
+-      integer ia(nzmax), ja(nzmax)
+-      complex*16 a(nzmax)
+-      common /CMAT/ a, ia, ja, nz, n
+ 
+       integer i, j
+       complex*16 ZERO
+@@ -143,18 +133,16 @@
+       END
+ *----------------------------------------------------------------------|
+ *----------------------------------------------------------------------|
+-      subroutine zgccsv( x, y )
++      subroutine zgccsv( n, nz, nzmax, ia, ja, a, x, y )
+       implicit none
++      integer n, nz, nzmax
++      integer ia(nzmax), ja(nzmax)
++      complex*16 a(nzmax)
+       complex*16 x(*), y(*)
+ *
+ *---  Computes y = A*x. A is passed via a fortran `common statement'.
+ *---  A is assumed to be under the Compress Column Storage (CCS) format.
+ *
+-      integer n, nz, nzmax
+-      parameter( nzmax = 50000 )
+-      integer ia(nzmax), ja(nzmax)
+-      complex*16 a(nzmax)
+-      common /CMAT/ a, ia, ja, nz, n
+ 
+       integer i, j
+       complex*16 ZERO
+Index: expokit-1.0/fortran/sample_b.f
+===================================================================
+--- expokit-1.0.orig/fortran/sample_b.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/sample_b.f	2009-09-14 11:13:05.000000000 +0200
+@@ -13,7 +13,6 @@
+       parameter( nmax = 5000, nzmax = 600000 )
+       integer ia(nzmax), ja(nzmax)
+       double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+ 
+ *---  arguments variables ...
+       integer m, mmax, lwsp, liwsp
+@@ -29,6 +28,9 @@
+ 
+       intrinsic ABS
+ *
++*---  Load default params ...
++      call defpar()
++*
+ *---  Executable statements ...
+ 
+ *---  load the matrix ...
+@@ -60,7 +62,7 @@
+ 
+ *---  compute exp(t*A)v with CRS format ...
+       tic = clock()
+-      call DSEXPV( n, m, t,v,w, tol, anorm,
++      call DSEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgcrsv, itrace, iflag )
+       tac = clock()
+ 
+@@ -109,7 +111,7 @@
+       t = -t
+       call DCOPY( n, w,1, v,1 )
+       tic = clock()
+-      call DSEXPV( n, m, t,v,w, tol, anorm,
++      call DSEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgcrsv, itrace, iflag )
+       tac = clock()
+ 
+Index: expokit-1.0/fortran/sample_d.f
+===================================================================
+--- expokit-1.0.orig/fortran/sample_d.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/sample_d.f	2009-09-14 11:13:05.000000000 +0200
+@@ -17,6 +17,9 @@
+       double precision DLARAN
+       intrinsic CMPLX, CONJG, MIN, DBLE, IMAG
+ 
++*
++*---  Load default params ...
++      call defpar()
+ *-------------------------
+ *     REAL CASE
+ *-------------------------
+@@ -46,7 +49,7 @@
+       print 9001,( (A(i,j), j=1,mprint), i=1,mprint )
+ *
+  9000 format( /,A,/,A )
+- 9001 format( <mprint>(1X,D11.4) )
++ 9001 format( 5(1X,D11.4) )
+ *---  Some compliers (e.g., g77) generate 'Unsupported FORMAT specifier'
+ *     with the specification above. In this case, simply use this form:
+ * 9001 format( 5(1X,D11.4) )
+Index: expokit-1.0/fortran/sample_g.f
+===================================================================
+--- expokit-1.0.orig/fortran/sample_g.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/sample_g.f	2009-09-14 11:13:05.000000000 +0200
+@@ -13,7 +13,6 @@
+       parameter( nmax = 5000, nzmax = 600000 )
+       integer ia(nzmax), ja(nzmax)
+       double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+ 
+ *---  arguments variables ...
+       integer m, mmax, lwsp, liwsp
+@@ -29,6 +28,10 @@
+ 
+       intrinsic ABS
+ *
++*---  Load default params ...
++      call defpar()
++      call setpar(1000, 0, 6, 1.2d0, 0.9d0 )
++*
+ *---  Executable statements ...
+ 
+ *---  load a Harwell-Boeing matrix ...
+@@ -62,7 +65,7 @@
+ 
+ *---  compute w = exp(t*A)v with COO format ...
+       tic = clock()
+-      call DGEXPV( n, m, t,v,w, tol, anorm,
++      call DGEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgcoov, itrace, iflag ) 
+       tac = clock()
+ 
+@@ -113,7 +116,7 @@
+ *---  compute w = exp(t*A)v with CCS format ...
+ 
+       tic = clock()
+-      call DGEXPV( n, m, t,v,w, tol, anorm,
++      call DGEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgccsv, itrace, iflag ) 
+       tac = clock()
+ 
+@@ -164,7 +167,7 @@
+ *---  compute w = exp(t*A)v with CRS format ...
+ 
+       tic = clock()
+-      call DGEXPV( n, m, t,v,w, tol, anorm,
++      call DGEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgcrsv, itrace, iflag ) 
+       tac = clock()
+ 
+Index: expokit-1.0/fortran/sample_m.f
+===================================================================
+--- expokit-1.0.orig/fortran/sample_m.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/sample_m.f	2009-09-14 11:13:05.000000000 +0200
+@@ -13,7 +13,6 @@
+       parameter( nmax=5000, nzmax = 600000 )
+       integer ia(nzmax), ja(nzmax)
+       double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+ 
+ *---  arguments variables ...
+       integer m, mmax, lwsp, liwsp
+@@ -29,6 +28,9 @@
+ 
+       intrinsic ABS
+ *
++*---  Load default params ...
++      call defpar()
++*
+ *---  Executable statements ...
+ 
+ *---  load the infinitesimal generator (CRS format)
+@@ -90,7 +92,7 @@
+ 
+ *---  compute w = exp(t*A)v with DMEXPV ...
+       tic = clock()
+-      call DMEXPV( n, m, t,v,w, tol, anorm,
++      call DMEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgcrsv, itrace, iflag )
+       tac = clock()
+ 
+@@ -137,7 +139,7 @@
+ 
+ *---  compute w = exp(t*A)v with DGEXPV ...
+       tic = clock()
+-      call DGEXPV( n, m, t,v,w, tol, anorm,
++      call DGEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgcrsv, itrace, iflag )
+       tac = clock()
+ 
+Index: expokit-1.0/fortran/sample_p.f
+===================================================================
+--- expokit-1.0.orig/fortran/sample_p.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/sample_p.f	2009-09-14 11:13:05.000000000 +0200
+@@ -13,7 +13,6 @@
+       parameter( nmax = 5000, nzmax = 600000 )
+       integer ia(nzmax), ja(nzmax)
+       double precision a(nzmax)
+-      common /RMAT/ a, ia, ja, nz, n
+ 
+ *---  arguments variables ...
+       integer m, mmax, lwsp, liwsp
+@@ -31,6 +30,10 @@
+       double precision DNRM2
+ 
+ *
++*---  Load default params ...
++      call defpar()
++      call setpar(1000, 0, 6, 1.2d0, 0.9d0 )
++*
+ *---  Executable statements ...
+ 
+ *---  load a Harwell-Boeing matrix ...
+@@ -75,7 +78,7 @@
+ 
+ *---  compute w = exp(t*A)*v with DGPHIV ...
+       tic = clock()
+-      call DGPHIV( n, m, t,u,v,w, tol, anorm,
++      call DGPHIV( n, nz, nzmax, ia, ja, a, m, t,u,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgccsv, itrace, iflag ) 
+       tac = clock()
+ 
+@@ -135,7 +138,7 @@
+ 
+ *---  compute w = t*phi(t*A)*u with DGPHIV ...
+       tic = clock()
+-      call DGPHIV( n, m, t,u,v,w, tol, anorm,
++      call DGPHIV( n, nz, nzmax, ia, ja, a, m, t,u,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgccsv, itrace, iflag ) 
+       tac = clock()
+ 
+@@ -181,7 +184,7 @@
+ *---  now check ||(u + A * w) - wsave||/||wsave||. Due to the specific
+ *     previous settings, the answer should agree with tol.
+ *
+-      call dgccsv( w, v )
++      call dgccsv( n, nz, nzmax, ia, ja, a, w, v )
+       call DAXPY( n, 1.0d0, u,1, v,1 )
+       call DAXPY( n, -1.0d0, wsave,1, v,1 )
+       tmp = DNRM2( n, v,1 ) / DNRM2( n, wsave, 1 )
+@@ -204,7 +207,7 @@
+ 
+ *---  compute w = exp(t*A)*v + t*phi(t*A)*u with DGPHIV ...
+       tic = clock()
+-      call DGPHIV( n, m, t,u,v,w, tol, anorm,
++      call DGPHIV( n, nz, nzmax, ia, ja, a, m, t,u,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, dgccsv, itrace, iflag ) 
+       tac = clock()
+ 
+Index: expokit-1.0/fortran/sample_z.f
+===================================================================
+--- expokit-1.0.orig/fortran/sample_z.f	2009-09-14 11:13:02.000000000 +0200
++++ expokit-1.0/fortran/sample_z.f	2009-09-14 11:13:05.000000000 +0200
+@@ -13,7 +13,6 @@
+       parameter( nmax = 5500, nzmax = 50000 )
+       integer ia(nzmax), ja(nzmax)
+       complex*16 a(nzmax)
+-      common /CMAT/ a, ia, ja, nz, n
+ 
+ *---  arguments variables ...
+       integer m, mmax, lwsp, liwsp
+@@ -30,6 +29,9 @@
+       double precision DLARAN
+       intrinsic ABS, CMPLX, CONJG, DBLE
+ *
++*---  Load default params ...
++      call defpar()
++*
+ *---  Executable statements ...
+ 
+ *---  load a symmetric pattern ...
+@@ -80,7 +82,7 @@
+       enddo
+ 
+ **--   convert from COO to CRS ...
+-*      call zgcnvr( 'coo','crs','n', n,n, nz, ia, ja, a, iwsp )
++*      call zgcnvr( 'coo','crs','n', n,n, nz, nzmax, ia, ja, a, iwsp )
+ *
+ **---  compute the infinite norm of A ...
+ *      anorm = 0.0d0
+@@ -109,7 +111,7 @@
+ 
+ *---  compute w = exp(t*A)v with ZGEXPV ...
+       tic = clock()
+-      call ZGEXPV( n, m, t,v,w, tol, anorm,
++      call ZGEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, zgcoov, itrace, iflag )
+       tac = clock()
+ 
+@@ -156,7 +158,7 @@
+ 
+ *---  compute w = exp(t*A)v with ZHEXPV ...
+       tic = clock()
+-      call ZHEXPV( n, m, t,v,w, tol, anorm,
++      call ZHEXPV( n, nz, nzmax, ia, ja, a, m, t,v,w, tol, anorm,
+      .             wsp,lwsp, iwsp,liwsp, zgcoov, itrace, iflag )
+       tac = clock()
+ 
+Index: expokit-1.0/fortran/params.f
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ expokit-1.0/fortran/params.f	2009-09-14 10:46:51.000000000 +0200
+@@ -0,0 +1,73 @@
++*----------------------------------------------------------------------|
++      subroutine defpar()      
++      
++      integer mxstep, mxreject, ideg
++      double precision delta, gamma
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
++
++*     mxstep  : maximum allowable number of integration steps.
++*               The value 0 means an infinite number of steps.
++* 
++*     mxreject: maximum allowable number of rejections at each step. 
++*               The value 0 means an infinite number of rejections.
++*
++*     ideg    : the Pade approximation of type (ideg,ideg) is used as 
++*               an approximation to exp(H). The value 0 switches to the
++*               uniform rational Chebyshev approximation of type (14,14)
++*
++*     delta   : local truncation error `safety factor'
++*
++*     gamma   : stepsize `shrinking factor'
++*
++*----------------------------------------------------------------------|
++*     Roger B. Sidje (rbs@maths.uq.edu.au)
++*     EXPOKIT: Software Package for Computing Matrix Exponentials.
++*     ACM - Transactions On Mathematical Software, 24(1):130-156, 1998
++*----------------------------------------------------------------------|
++*
++      mxstep   = 500
++      mxreject = 0
++      ideg     = 6
++      delta    = 1.2d0
++      gamma    = 0.9d0
++*
++      end
++*----------------------------------------------------------------------|
++      subroutine setpar(nstep, nreject, ndeg, dlta, gama)
++
++      integer nstep, nreject, ndeg
++      double precision dlta, gama
++      
++      integer mxstep, mxreject, ideg
++      double precision delta, gamma
++      common /iparam/ mxstep, mxreject, ideg
++      common /dparam/ delta, gamma
++      
++*     mxstep  : maximum allowable number of integration steps.
++*               The value 0 means an infinite number of steps.
++* 
++*     mxreject: maximum allowable number of rejections at each step. 
++*               The value 0 means an infinite number of rejections.
++*
++*     ideg    : the Pade approximation of type (ideg,ideg) is used as 
++*               an approximation to exp(H). The value 0 switches to the
++*               uniform rational Chebyshev approximation of type (14,14)
++*
++*     delta   : local truncation error `safety factor'
++*
++*     gamma   : stepsize `shrinking factor'
++*
++*----------------------------------------------------------------------|
++*     Roger B. Sidje (rbs@maths.uq.edu.au)
++*     EXPOKIT: Software Package for Computing Matrix Exponentials.
++*     ACM - Transactions On Mathematical Software, 24(1):130-156, 1998
++*----------------------------------------------------------------------|
++*
++      mxstep   = nstep
++      mxreject = nreject
++      ideg     = ndeg 
++      delta    = dlta
++      gamma    = gama
++*
++      end

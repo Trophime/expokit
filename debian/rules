@@ -1,0 +1,44 @@
+#!/usr/bin/make -f
+
+#include /usr/share/hardening-includes/hardening.make
+FFLAGS:=$(shell dpkg-buildflags --get FFLAGS)
+LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
+# The directories below are versioned.  We only support the packages for the
+# stable version of Octave
+mpath = $(shell octave-config -p LOCALFCNFILEDIR)
+
+%:
+	dh $@ --buildsystem=makefile --parallel
+
+override_dh_auto_build:
+	$(MAKE) -C $(CURDIR)/fortran FFLAGS="$(FFLAGS) -fPIC" LDFLAGS="$(LDFLAGS)"
+
+
+override_dh_auto_install:
+	$(MAKE) -C $(CURDIR)/fortran install DESTDIR=$(CURDIR)/debian/tmp/
+	cd $(CURDIR)/debian/tmp/usr/lib && ln -snf libexpokit.so.1.0.0 libexpokit.so.1
+	cd $(CURDIR)/debian/tmp/usr/lib && ln -snf libexpokit.so.1.0.0 libexpokit.so 
+	
+	# Install octave bindings
+	mkdir -p $(CURDIR)/debian/tmp/$(mpath)
+	install -m 644 matlab/*.m $(CURDIR)/debian/tmp/$(mpath)
+
+override_dh_auto_clean:
+	$(MAKE) -C $(CURDIR)/fortran clean
+	find . \( -name "*.o" -o -name "*.a"  -o -name "*.so*" \) -delete
+
+DEB_STRIPPED_UPSTREAM_VERSION = $(shell echo $(DEB_UPSTREAM_VERSION) | sed -n -e 's/\.dfsg.*$$//p')
+DEB_STRIPPED_UPSTREAM_VERSION = $(shell echo $(DEB_UPSTREAM_VERSION) | sed -n -e 's/\.dfsg.*$$//p')
+
+get-orig-source:
+	set -ex ; \
+        TMPDIR=`mktemp -d expokit-$(DEB_UPSTREAM_VERSION).orig` ; \
+        uscan --force-download --symlink --check-dirname-level 0 --destdir "$$TMPDIR" ; \
+        tar -C "$$TMPDIR" --strip-components 1 -xzf "$$TMPDIR"/expokit_$(DEB_STRIPPED_UPSTREAM_VERSION).orig.tar.gz ; \
+        rm -f "$$TMPDIR"/expokit*.tar.gz ; \
+        rm -rf "$$TMPDIR"/Arpack ; \
+        GZIP=-9 tar -czf \
+            $(CURDIR)/expokit_$(DEB_UPSTREAM_VERSION).orig.tar.gz \
+            expokit-$(DEB_UPSTREAM_VERSION).orig ; \
+        rm -rf "$$TMPDIR"

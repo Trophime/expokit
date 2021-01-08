@@ -1,0 +1,47 @@
+Source: expokit
+Priority: extra
+Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
+Uploaders: Christophe Trophime <christophe.trophime@lncmi.cnrs.fr>
+Build-Depends: debhelper-compat (= 12), 
+ gfortran-9, 
+ liblapack-dev
+# dh-octave
+Standards-Version: 4.5.0
+Section: libs
+Homepage: http://www.maths.uq.edu.au/expokit
+
+Package: libexpokit-examples
+Section: libdevel
+Architecture: any
+Depends: libexpokit1 (= ${binary:Version}), ${misc:Depends} 
+Description: Matrix exponential calculation library - examples
+ Expokit is a software package that provides matrix exponential routines 
+ for small dense or very large sparse matrices, real or complex.
+ .
+ examples
+
+# Package: octave-expokit
+# Section: libdevel
+# Architecture: any
+# Depends: libexpokit1 (= ${binary:Version}), ${octave:Depends}, ${misc:Depends} 
+# Description: Matrix exponential calculation library - matlab version
+#  Expokit is a software package that provides matrix exponential routines 
+#  for small dense or very large sparse matrices, real or complex.
+#  .
+#  Matlab extension
+
+Package: libexpokit-dev
+Section: libdevel
+Architecture: any
+Depends: libexpokit1 (= ${binary:Version}), ${misc:Depends} 
+Description: Matrix exponential calculation library - static version
+ Expokit is a software package that provides matrix exponential routines 
+ for small dense or very large sparse matrices, real or complex.
+
+Package: libexpokit1
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends} 
+Description: Matrix exponential calculation
+ Expokit is a software package that provides matrix exponential routines 
+ for small dense or very large sparse matrices, real or complex.
